@@ -2,28 +2,21 @@ function lambeth_map(elem) {
     this.types = []; //Array to hold all the possible 'layers' of data
     this.currently_selected_type = 'all'; //Which 'layer' is currently  selected
     this.icons = [];
-
-    //need to add an id to the element because leaflet requires it... 
-    this.elem_id = Math.random().toString(36).substring(7);
     
-
-    this.outline_url    = jQuery(elem).attr('data-map-outline-url');
-    this.post           = jQuery(elem).attr('data-map-postcode-search');
-    this.url            = jQuery(elem).attr('data-map-url'); //URL for geoJSON
-    this.filterField    = jQuery(elem).attr('data-map-filter-on'); // Field used for dropdown/lookup
-    this.zoom           = parseInt(jQuery(elem).attr('data-map-zoom')); //Map Zoom
-    centre              = jQuery(elem).attr('data-map-centre').split(','); //Map Centre
+    //import config
+    this.outline_url     = jQuery(elem).attr('data-map-outline-url');
     
-    this.key_elem       = jQuery(elem).find('.key'); 
-    
-    
-    this.lat = parseFloat(centre[0]);
-    this.lng = parseFloat(centre[1]);
+    this.url             = jQuery(elem).attr('data-map-url'); //URL for geoJSON
+    this.filterField     = jQuery(elem).attr('data-map-filter-on'); // Field used for dropdown/lookup
+    this.zoom            = parseInt(jQuery(elem).attr('data-map-zoom')); //Map Zoom
 
-    this.mapHeight = parseInt(jQuery(elem).attr('data-map-height'));
-    this.mapWidth = parseInt(jQuery(elem).attr('data-map-width'));
+    centre               = jQuery(elem).attr('data-map-centre').split(','); //Map Centre
+    this.lat             = parseFloat(centre[0]);
+    this.lng             = parseFloat(centre[1]);
 
-    this.searchType = jQuery(elem).attr('data-map-search-type');
+    this.postcode_search = jQuery(elem).attr('data-map-postcode-search');
+    this.searchType      = jQuery(elem).attr('data-map-search-type');
+
     this.elem = elem; //The HTML element we inserting into
     this.drawMap(); //Init the map                                   
 }
@@ -32,20 +25,28 @@ function lambeth_map(elem) {
 lambeth_map.prototype.drawMap = function () {
 
     var maps_object = this;
-    console.log(this.elem);
+    
     //add container for the map
-    jQuery(this.elem).append("<div class='map_container' id='container_" + this.elem_id + "'></div>");
-    jQuery('#container_' + this.elem_id).append("<div class='map' id='map_" + this.elem_id + "'></div>");
+    jQuery(this.elem).append("<div class='map_container'></div>");
+    jQuery('.map_container', this.elem).append("<div class='leaflet_container'></div>");
     
-    //set the map height 
-    jQuery(this.elem).css('height', this.mapHeight);
-    //set the map Width
-    jQuery(this.elem).css('width', this.mapWidth);
     
-    console.log("map_" + this.elem_id);
+    //do we need to render a control panel? 
+    if (this.searchType || this.postcode_search) {
+
+        //move the main map over 
+        $('.leaflet_container', this.elem).addClass("map_with_controls");
+        
+        //add control panel 
+        var html = '<div class="controls_container"></div>';
+        jQuery(".map_container", maps_object.elem).append(html)
+    }
     
-    //instatiate the map
-    this.map = L.map("map_" + this.elem_id, {scrollWheelZoom: false}).setView([this.lat, this.lng], this.zoom);
+    if (this.postcode_search) { 
+        this.renderPostcodeLookup();
+    }
+    
+    this.map = L.map($('.leaflet_container', this.elem)[0], {scrollWheelZoom: false}).setView([this.lat, this.lng], this.zoom);
 
     //using the cloudmade tiles
     L.tileLayer('http://{s}.tile.cloudmade.com/e7b61e61295a44a5b319ca0bd3150890/997/256/{z}/{x}/{y}.png').addTo(this.map);
@@ -133,14 +134,7 @@ lambeth_map.prototype.discoverTypes = function () {
             
             maps_object.addPoints();  // add the points
             
-            //de we need to render a control panel? 
-            if (maps_object.searchType || postcode-search) {
-                
-                //move the main map over  
-                
-                var html = '<div id="controls_container_' + this.elem_id + '" class="controls_container"></div>';
-                jQuery('#' + this.elem_id).after(html);
-            } 
+
             
             
             if (maps_object.searchType == 'drop-down') { //render the right UX
@@ -198,20 +192,19 @@ lambeth_map.prototype.renderDropDown = function () {
     var maps_object = this;
 
     //add the selector HTML
-    var html = '<div id="controls_container_' + this.elem_id + '" class="controls_container"><select id="type_selector_' + this.elem_id + '" class="type_selector"></selector></div>';
-    jQuery('#' + this.elem_id).after(html);
+    var html = '<select  class="type_selector"></selector>';
+    jQuery('.controls_container', this.elem).append(html);
 
-    jQuery('#type_selector_' + this.elem_id).append("<option value='all'>Select options here</option>");
+    jQuery('.type_selector', this.elem).append("<option value='all'>Select options here</option>");
 
     jQuery.each(this.types, function (key, value) {
-        jQuery('#type_selector_' + maps_object.elem_id).append("<option value='" + value + "'>" + value + "</option>");
+        jQuery('.type_selector', this.elem).append("<option value='" + value + "'>" + value + "</option>");
     });
 
     //ensure there are no events stuck on this element
-    jQuery('#type_selector_' + this.elem_id).unbind();
-    jQuery('#type_selector_' + this.elem_id).change(function () {
+    jQuery('.type_selector', this.elem).unbind();
+    jQuery('.type_selector', this.elem).change(function () {
         maps_object.currently_selected_type = jQuery(this).val();
-        
         maps_object.addPoints();
     });
 }
@@ -220,11 +213,11 @@ lambeth_map.prototype.renderAutoSuggest = function () {
 
     var maps_object = this;
 
-    var html = '<div id="controls_container_' + this.elem_id + ' class="controls_container"><span class="instructions">Search for recycling items: </span><input type="text" id="type_suggest_' + this.elem_id + '" class="type_suggest" /></div>';
+    var html = '<div class="autosuggest">Where can I get rid of... </span><input type="text" class="type_suggest" /></div>';
 
-    jQuery('#' + this.elem_id).after(html);
+    jQuery('.controls_container', this.elem).append(html);
 
-    jQuery('#type_suggest_' + this.elem_id).autocomplete({
+    jQuery('.type_suggest', this.elem).autocomplete({
         source: maps_object.types,
         change: function (event, ui) {
 
@@ -263,10 +256,12 @@ lambeth_map.prototype.renderKey = function(options) {
 }
 
 lambeth_map.prototype.renderPostcodeLookup = function () {
+    console.log('rendering postcode lookup');
+    
     var maps_object = this;
 
-    var html = '<div class="postcode_lookup"><input type="text" id="postcode_lookup_' + this.elem_id + '"  /><input type="button" id="postcode_button_' + this.elem_id + '" value="search"</div>';
-    jQuery('#' + this.elem_id).after(html);
+    var html = '<div class="postcode_lookup"><input type="text"   /><input type="button" class="postcode_submit" value="search"</div>';
+    jQuery('.controls_container', this.elem).after(html);
 
     $('#postcode_button_' + this.elem_id).click(function () {
         var val = $('#postcode_lookup_' + maps_object.elem_id).val();

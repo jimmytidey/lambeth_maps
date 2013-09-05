@@ -17,7 +17,7 @@
     height:100%;
 }   
 
-.map { 
+.leaflet_container { 
     position:absolute;
     top:0px;
     bottom:0px;
@@ -25,12 +25,16 @@
     right:0px;
 }
 
+.map_with_controls { 
+    left:220px;
+}
+
 .controls_container { 
     position: absolute;
     left:0px;
     top:0px;
     bottom:0px;
-    width:160px;
+    width:220px;
     background-color:white;
     border:1px dashed blue;
 }
