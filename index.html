@@ -27,29 +27,24 @@
 
         <div class="container">
             
-        <div id='test_map' class="lambeth_map"  
-            data-map-url="http://www.lambeth.coop/council-services-places-geojson" 
-            data-map-zoom="13" data-map-centre="51.459677 , -0.123429" 
-            data-map-search-type="auto-suggest" 
-            data-map-postcode-search='true'
-            data-map-filter-on="field_place_place_taxonomy_rendered"
-            data-map-outline-url="outline.json">
+        <div class='row'>
+            <div id='test_map' class="lambeth_map span3"  
+                data-map-url="http://www.lambeth.coop/council-services-places-geojson" 
+                data-map-zoom="13" data-map-centre="51.459677 , -0.123429" 
+                data-map-search-type="key" 
+                data-map-postcode-search='true'
+                data-map-filter-on="field_place_place_taxonomy_rendered"
+                data-map-outline-url="outline.json">
+            </div>
         </div>
         
-        <div id='test_map' class="lambeth_map"  
-            data-map-url="http://www.lambeth.coop/council-services-places-geojson" 
-            data-map-zoom="13" data-map-centre="51.459677 , -0.123429" 
-            data-map-search-type="drop-down" 
-            data-map-postcode-search='true'
-            data-map-filter-on="field_place_place_taxonomy_rendered"
-            data-map-outline-url="outline.json">
-        </div>
+
         
            
         <script src="//ajax.googleapis.com/ajax/libs/jquery/1.10.1/jquery.min.js"></script>
         <script>window.jQuery || document.write('<script src="js/vendor/jquery-1.10.1.min.js"><\/script>')</script>
         <script src="http://code.jquery.com/ui/1.10.3/jquery-ui.js"></script>
-        <script src="js/vendor/bootstrap.min.js"></script>
+      
         <script src="http://cdn.leafletjs.com/leaflet-0.6.4/leaflet.js"></script>
         <script src="js/main.js"></script>
         

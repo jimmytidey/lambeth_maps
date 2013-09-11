@@ -1,7 +1,7 @@
 function lambeth_map(elem) {
-    this.types = []; //Array to hold all the possible 'layers' of data
-    this.currently_selected_type = 'all'; //Which 'layer' is currently  selected
-    this.icons = [];
+    this.types          = []; //Array to hold all the possible 'layers' of data
+    this.icons          = [];
+    this.point_layers   = [];
     
     //import config
     this.outline_url     = jQuery(elem).attr('data-map-outline-url');
@@ -22,6 +22,8 @@ function lambeth_map(elem) {
 }
 
 
+
+
 lambeth_map.prototype.drawMap = function () {
 
     var maps_object = this;
@@ -32,7 +34,7 @@ lambeth_map.prototype.drawMap = function () {
     
     
     //do we need to render a control panel? 
-    if (this.searchType || this.postcode_search) {
+    if (this.searchType || this.postcode_search === 'true') {
 
         //move the main map over 
         $('.leaflet_container', this.elem).addClass("map_with_controls");
@@ -42,7 +44,7 @@ lambeth_map.prototype.drawMap = function () {
         jQuery(".map_container", maps_object.elem).append(html)
     }
     
-    if (this.postcode_search) { 
+    if (this.postcode_search === 'true') { 
         this.renderPostcodeLookup();
     }
     
@@ -88,22 +90,27 @@ lambeth_map.prototype.renderOutline = function () {
 }
 
 lambeth_map.prototype.discoverTypes = function () {
-    
+
     //List every type of feature in the geo JSON
     var maps_object = this;
 
     jQuery.each(this.data.features, function (key, value) {
-        
-        if (value.properties[maps_object.filterField] && jQuery.inArray(value.properties[maps_object.filterField], maps_object.types) == -1) {
+
+        //this is new type never encountered before
+        if(value.properties[maps_object.filterField] && jQuery.inArray(value.properties[maps_object.filterField], maps_object.types) == -1) {
 
             var type_name = value.properties[maps_object.filterField];
 
-            if (type_name !== '' && type_name !== null) {
+            if(type_name !== '' && type_name !== null) {
 
-                maps_object.types.push(type_name);
+                var type_id = maps_object.types.push(type_name) - 1;
+
+                value.properties.type_id = type_id;
 
                 //add new icon if one is available
-                if (value.properties.uri_rendered) {
+                if(value.properties.uri_rendered) {
+
+                    value.properties.has_icon = true;
 
                     var CustomIcon = L.icon({
                         iconUrl: value.properties.uri_rendered,
@@ -112,73 +119,66 @@ lambeth_map.prototype.discoverTypes = function () {
                         popupAnchor: [0, -25]
                     });
 
-                    var id = maps_object.icons.push(CustomIcon);
+                    maps_object.icons[type_id] = CustomIcon;
 
-                    value.properties.icon_id = id - 1;
-
-                    //now we need to see if any other pins should have this icon id  
-                    for (i = 0; i < maps_object.data.features.length; i++) {
-
-                        if (maps_object.data.features[i]) {
-                            
-                            if (maps_object.data.features[i].properties.uri_rendered == value.properties.uri_rendered) {
-                                maps_object.data.features[i].properties.icon_id = id - 1;
-                            }
-                        }
-                    }
                 }
+            }
+        }    
+
+        //this type has been encountered before, we should assign the correct ID
+        else {
+            //assing ID
+            type_id = 0;
+            $.each(maps_object.types, function (type_key, type_val) {
+                if(type_val === value.properties[maps_object.filterField]) {
+                    type_id = type_key;
+                    return false
+                }
+            });
+
+            //also say whether the ID is set 
+            value.properties.type_id = type_id;
+            if(value.properties.uri_rendered) {
+                value.properties.has_icon = true;
             }
         }
 
-        if (maps_object.data.features.length - 1 == key) { //detect when we have looped through all the features
-            
-            maps_object.addPoints();  // add the points
-            
+        //detect when we have looped through all the features
+        if(maps_object.data.features.length - 1 == key) {
 
-            
-            
-            if (maps_object.searchType == 'drop-down') { //render the right UX
+            //render the right UX
+            if(maps_object.searchType == 'drop-down') {
                 maps_object.renderDropDown();
-            } 
-            
-            else if (maps_object.searchType == 'auto-suggest') {
+            } else if(maps_object.searchType == 'auto-suggest') {
                 maps_object.renderAutoSuggest();
-            }
-            
-            else if (maps_object.searchType == 'key') {
+            } else if(maps_object.searchType == 'key') {
                 maps_object.renderKey();
             }
-            
-            
+
         }
     });
 }
 
-lambeth_map.prototype.addPoints = function () {
+lambeth_map.prototype.addLayer = function(type_id) {
 
     var maps_object = this;
-
-    //remove the existing stuff, if there is any
-    if (typeof this.geoJsonLayer !== 'undefined') {
-        this.map.removeLayer(maps_object.geoJsonLayer);
-    }
-
+    
     //add new stuff
-    this.geoJsonLayer = L.geoJson(this.data, {
-        onEachFeature: function (feature, layer) {
-
-
-            if (typeof feature.properties.icon_id !== 'undefined') {
-                layer.setIcon(maps_object.icons[feature.properties.icon_id]);
+    this.point_layers[type_id] = L.geoJson(this.data, {
+        onEachFeature: function (feature, leaflet_layer) { //layer here refering to leaflets internal concept of layer
+            if (typeof feature.properties.has_icon) {
+               if (leaflet_layer.setIcon) {
+                   leaflet_layer.setIcon(maps_object.icons[feature.properties.type_id]);
+                }
             }
-
-            layer.bindPopup(feature.properties.name);
+            leaflet_layer.bindPopup(feature.properties.name);
         },
         filter: function (feature) {
-
-            if (maps_object.currently_selected_type == 'all') {
+            console.log(type_id); 
+            console.log(feature.properties.type_id); 
+            if (type_id === 'all') {
                 return true;
-            } else if (lambeth_map.htmlDecode(feature.properties[maps_object.filterField]) == maps_object.currently_selected_type) {
+            } else if (feature.properties.type_id == type_id) {
                 return true;
             } else {
                 return false;
@@ -187,10 +187,27 @@ lambeth_map.prototype.addPoints = function () {
     }).addTo(this.map);
 }
 
+lambeth_map.prototype.removeAllLayers = function() { 
+    
+    var maps_object = this;
+    
+    $.each(this.point_layers, function(key, val) { 
+    
+        if (typeof val !== 'undefined') {
+            this.map.removeLayer(val);
+        }
+    });
+}
+
+
+lambeth_map.prototype.removeLayer = function(type_id) { 
+    this.map.removeLayer(this.point_layers[type_id]);
+}
+
 lambeth_map.prototype.renderDropDown = function () {
 
     var maps_object = this;
-
+        
     //add the selector HTML
     var html = '<select  class="type_selector"></selector>';
     jQuery('.controls_container', this.elem).append(html);
@@ -198,14 +215,14 @@ lambeth_map.prototype.renderDropDown = function () {
     jQuery('.type_selector', this.elem).append("<option value='all'>Select options here</option>");
 
     jQuery.each(this.types, function (key, value) {
-        jQuery('.type_selector', this.elem).append("<option value='" + value + "'>" + value + "</option>");
+        jQuery('.type_selector', this.elem).append("<option value='" + key + "'>" + value + "</option>");
     });
 
     //ensure there are no events stuck on this element
     jQuery('.type_selector', this.elem).unbind();
     jQuery('.type_selector', this.elem).change(function () {
-        maps_object.currently_selected_type = jQuery(this).val();
-        maps_object.addPoints();
+         v = jQuery(this).val();
+        maps_object.addLayer(layer_id);
     });
 }
 
@@ -220,15 +237,12 @@ lambeth_map.prototype.renderAutoSuggest = function () {
     jQuery('.type_suggest', this.elem).autocomplete({
         source: maps_object.types,
         change: function (event, ui) {
-
-            maps_object.currently_selected_type = ui.item.value;
-
-            maps_object.addPoints();
+            layer_id = ui.item.key; //dunno if this will work 
+            maps_object.addLayer(layer_id);
         },
         select: function (event, ui) {
-            maps_object.currently_selected_type = ui.item.value;
-
-            maps_object.addPoints();
+            layer_id = ui.item.key; //dunno if this will work 
+            maps_object.addLayer(layer_id);
         }
     });
 }
@@ -236,38 +250,45 @@ lambeth_map.prototype.renderAutoSuggest = function () {
 lambeth_map.prototype.renderKey = function(options) { 
     
     var maps_object = this;
-
-    
+        
     //add the selector HTML
-    var html = '<div id="key_' + maps_object.elem_id + '"></div>';
-    jQuery('#' + maps_object.elem_id).after(html);
+    var html = '<div class="key"><div>';
+    jQuery('.controls_container',  this.elem).append(html);
 
     jQuery.each(this.types, function (key, value) {
-        
-        jQuery('#key_' + maps_object.elem_id).append("<div class='key_item' ><label for='checkbox_" + value + "'>" + value + "</label><input id='checkbox_"+value+ "' type='checkbox' value='" + value + "' /></div>");
+        var img_url = maps_object.icons[key].options.iconUrl; 
+        jQuery('.key', maps_object.elem).append("<div class='key_item' ><img src='"+img_url+"' /><label for='checkbox_" + value + "'>" + value + "</label><input id='checkbox_"+value+ "' type='checkbox' value='" + key + "' /></div>");
     });
     
     //ensure there are no events stuck on this element
-    jQuery('#type_selector_' + this.elem_id).unbind();
-    jQuery('#type_selector_' + this.elem_id).change(function () {
-        maps_object.currently_selected_type = jQuery(this).val();
-        maps_object.addPoints();
+    jQuery('.key_item input',  this.elem).unbind();
+    jQuery('.key_item input',  this.elem).change(function () {
+        var key = jQuery(this).val();
+        if($(this).prop('checked')) {         
+            maps_object.addLayer(parseInt(key));
+        }
+        else { 
+            maps_object.removeLayer(parseInt(key));
+        }
     });
 }
 
 lambeth_map.prototype.renderPostcodeLookup = function () {
-    console.log('rendering postcode lookup');
     
     var maps_object = this;
 
-    var html = '<div class="postcode_lookup"><input type="text"   /><input type="button" class="postcode_submit" value="search"</div>';
-    jQuery('.controls_container', this.elem).after(html);
+    var html = '<div class="postcode_lookup"><p>Show facilities near: <input type="text" placeholder="postcode or address"   /><input type="button" class="postcode_submit" value="search"</div>';
+    
+    jQuery('.controls_container', this.elem).append(html);
+    
+    lambeth_map.addPlaceholder();
 
-    $('#postcode_button_' + this.elem_id).click(function () {
+    //TODO remove elem_id
+    $('#postcode_button_' + this.elem_id).click(function () { 
         var val = $('#postcode_lookup_' + maps_object.elem_id).val();
         
         maps_object.postcodeLookup(val);
-
+        
     });
 
     $('#postcode_lookup_' + this.elem_id).keyup('enterKey', function (e) {
@@ -291,11 +312,6 @@ lambeth_map.prototype.postcodeLookup = function (postcode) {
     });
 };
 
-lambeth_map.htmlDecode = function (input) {
-    var e = document.createElement('div');
-    e.innerHTML = input;
-    return e.childNodes.length === 0 ? "" : e.childNodes[0].nodeValue;
-}
 
 jQuery(document).ready(function () {
     //Loop through all the maps elements and init a map
@@ -304,3 +320,37 @@ jQuery(document).ready(function () {
         lambeth_maps.push(new lambeth_map(val));
     });
 });
+
+//UTILITY FUNCTION 
+lambeth_map.htmlDecode = function (input) {
+    var e = document.createElement('div');
+    e.innerHTML = input;
+    return e.childNodes.length === 0 ? "" : e.childNodes[0].nodeValue;
+}
+
+lambeth_map.addPlaceholder = function() {
+    if(!Modernizr.input.placeholder){
+
+    	$('[placeholder]').focus(function() {
+    	  var input = $(this);
+    	  if (input.val() == input.attr('placeholder')) {
+    		input.val('');
+    		input.removeClass('placeholder');
+    	  }
+    	}).blur(function() {
+    	  var input = $(this);
+    	  if (input.val() == '' || input.val() == input.attr('placeholder')) {
+    		input.addClass('placeholder');
+    		input.val(input.attr('placeholder'));
+    	  }
+    	}).blur();
+    	$('[placeholder]').parents('form').submit(function() {
+    	  $(this).find('[placeholder]').each(function() {
+    		var input = $(this);
+    		if (input.val() == input.attr('placeholder')) {
+    		  input.val('');
+    		}
+    	  })
+    	});
+    }
+}
