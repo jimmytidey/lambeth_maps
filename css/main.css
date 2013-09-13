@@ -41,24 +41,70 @@
 }
 
 .postcode_lookup { 
+    width:200px;
+    margin:10px;
+}
+
+.postcode_input { 
+    width:150px;
 
 }
 
+.postcode_submit {
+    background-image: url("../img/search.png");
+    height: 30px;
+    margin-top: -12px;
+    width: 33px !important;
+    border:none;
+    background-color:white;
+}
+
+
+    
 .key_item {
     float:left;
-    width:100%;
+    width:200px;
+    padding-bottom:10px;
+    margin-left:10px;
+    padding-top:10px;
+    border-bottom:1px solid #bbb;
+    border-top:1px solid #eee;
+}
+
+.key_item:first-child {
+    border-top:none;
+}
+
+.key_item:last-child {
+    border-bottom:none;
+}
+
+.key_item img {
+    width:20px;
+    float:left;
 }
 
 .key_item label { 
     float:left;
-    width:180px;
+    width:170px;
     margin-left:10px;
     margin-bottom:10px;
 }
 
 .key_item input { 
     float:right;
-    margin-right:10px;
+    margin-top:-25px;
+}
+
+.loading_gif { 
+    position:relative;
+    top:-45px;
+    left:140px;
+    z-index:50;
+}
+
+.warning { 
+    color:red;
 }
 
 

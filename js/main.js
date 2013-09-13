@@ -22,8 +22,6 @@ function lambeth_map(elem) {
 }
 
 
-
-
 lambeth_map.prototype.drawMap = function () {
 
     var maps_object = this;
@@ -61,15 +59,17 @@ lambeth_map.prototype.drawMap = function () {
         maps_object.discoverTypes();
     });
 
-
     //show the boundry of lambeth
+    console.log('render outline');
     this.renderOutline();
 };
 
 lambeth_map.prototype.renderOutline = function () {
+    console.log('rendering outline');
     var maps_object = this;
     
-    this.outline_style = { //style the outline - may want to customise this
+    //style the outline - may want to customise this
+    this.outline_style = { 
         "color": "#004a86",
         fillColor: "#fff",
         weight: 3,
@@ -77,16 +77,14 @@ lambeth_map.prototype.renderOutline = function () {
         fillOpacity: 0.3
     };
     
-
     //draws the outline of lambeth
     jQuery.getJSON(this.outline_url, function (data) {
+        console.log('data', data);
         maps_object.outline = data;
         L.geoJson(maps_object.outline, {
             style: maps_object.outline_style
         }).addTo(maps_object.map);
     });
-    
-
 }
 
 lambeth_map.prototype.discoverTypes = function () {
@@ -256,8 +254,11 @@ lambeth_map.prototype.renderKey = function(options) {
     jQuery('.controls_container',  this.elem).append(html);
 
     jQuery.each(this.types, function (key, value) {
+        
         var img_url = maps_object.icons[key].options.iconUrl; 
-        jQuery('.key', maps_object.elem).append("<div class='key_item' ><img src='"+img_url+"' /><label for='checkbox_" + value + "'>" + value + "</label><input id='checkbox_"+value+ "' type='checkbox' value='" + key + "' /></div>");
+        var html = "<div class='key_item' ><img src='"+img_url+"' /><label for='checkbox_" + value + "'>" + value + "</label><input id='checkbox_"+value+ "' type='checkbox' value='" + key + "' /></div>";
+       
+        jQuery('.key', maps_object.elem).append(html);
     });
     
     //ensure there are no events stuck on this element
@@ -277,38 +278,64 @@ lambeth_map.prototype.renderPostcodeLookup = function () {
     
     var maps_object = this;
 
-    var html = '<div class="postcode_lookup"><p>Show facilities near: <input type="text" placeholder="postcode or address"   /><input type="button" class="postcode_submit" value="search"</div>';
+    var html = '<div class="postcode_lookup"><p>Search by location: <input type="text" placeholder="postcode or address" class="postcode_input"  /><input type="button" class="postcode_submit" /></div>';
     
     jQuery('.controls_container', this.elem).append(html);
     
     lambeth_map.addPlaceholder();
 
-    //TODO remove elem_id
-    $('#postcode_button_' + this.elem_id).click(function () { 
-        var val = $('#postcode_lookup_' + maps_object.elem_id).val();
-        
+
+    $('.postcode_submit', this.elem).click(function () { 
+        var val = $('.postcode_input', maps_object.elem).val();
         maps_object.postcodeLookup(val);
-        
     });
 
-    $('#postcode_lookup_' + this.elem_id).keyup('enterKey', function (e) {
+    $('.postcode_input', this.elem).keyup('enterKey', function (e) {
         if (e.keyCode === 13) {
-            var val = $('#postcode_lookup_' + maps_object.elem_id).val();
+            var val = $('.postcode_submit', maps_object.elem).val();
             maps_object.postcodeLookup(val);
         }
     });
 };
 
 
-
 lambeth_map.prototype.postcodeLookup = function (postcode) {
 
     var maps_object = this;
-
+    
+    //remove any current warnings
+    $('.warning', maps_object.elem).remove();
+    
+    //specific to brixton !! 
+    address_array = postcode.split(' ');
+    
+    for(i=0; i<address_array.length; i++) { 
+        //test if this is a brixton postcode with spaces missing
+        if (address_array[i].length == 6 && (address_array[i].toUpperCase().substr(0,3) == 'SW2' || address_array[i].toUpperCase().substr(0,3) == 'SW9'  )) {
+           address_array[i] = address_array[i].slice(0, 3) + " " + address_array[i].slice(3);
+        }
+    }
+    
+    $('.postcode_lookup', maps_object.elem).append('<img src="img/loading.gif" class="loading_gif" alt="loading" />'); 
+    
+    postcode = address_array.join(' '); 
     postcode = encodeURIComponent(postcode);
-
-    jQuery.getJSON('http://nominatim.openstreetmap.org/search?format=json&q=' + postcode + '&countrycodes=gb&json_callback=?', function (data) {
-        maps_object.map.setView([data[0].lat, data[0].lon], 15);
+    
+    jQuery.getJSON('http://nominatim.openstreetmap.org/search?format=json&q=' + postcode + '&bounded=1&boundingbox="51.417986,51.507918,-0.078743,-0.15216"&json_callback=?', function (data) {
+        
+        console.log(data);
+        
+        $('.loading_gif', maps_object.elem).remove();
+        
+        if (typeof data[0] === 'undefined') { 
+            $('.postcode_lookup', maps_object.elem).append('<p style="display:none" class="warning">No results found</p>');
+            $('.warning', maps_object.elem).slideDown('slow').delay(5000).slideUp('slow', function(){
+                $('.warning', maps_object.elem).remove();
+            });
+        }
+        else {
+            maps_object.map.setView([data[0].lat, data[0].lon], 15);
+        }
     });
 };
 
@@ -329,7 +356,7 @@ lambeth_map.htmlDecode = function (input) {
 }
 
 lambeth_map.addPlaceholder = function() {
-    if(!Modernizr.input.placeholder){
+    if(typeof Modernizr === 'undefined'){
 
     	$('[placeholder]').focus(function() {
     	  var input = $(this);
