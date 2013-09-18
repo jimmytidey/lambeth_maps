@@ -146,6 +146,7 @@ lambeth_map.prototype.discoverTypes = function () {
 
             //render the right UX
             if(maps_object.searchType == 'drop-down') {
+                
                 maps_object.renderDropDown();
             } else if(maps_object.searchType == 'auto-suggest') {
                 maps_object.renderAutoSuggest();
@@ -192,7 +193,7 @@ lambeth_map.prototype.removeAllLayers = function() {
     $.each(this.point_layers, function(key, val) { 
     
         if (typeof val !== 'undefined') {
-            this.map.removeLayer(val);
+            maps_object.map.removeLayer(val);
         }
     });
 }
@@ -218,9 +219,10 @@ lambeth_map.prototype.renderDropDown = function () {
 
     //ensure there are no events stuck on this element
     jQuery('.type_selector', this.elem).unbind();
-    jQuery('.type_selector', this.elem).change(function () {
-         v = jQuery(this).val();
-        maps_object.addLayer(layer_id);
+    jQuery('.type_selector', this.elem).change(function() {
+        maps_object.removeAllLayers();
+        var key = jQuery(this).val();
+        maps_object.addLayer(parseInt(key));
     });
 }
 
@@ -265,7 +267,7 @@ lambeth_map.prototype.renderKey = function(options) {
     jQuery('.key_item input',  this.elem).unbind();
     jQuery('.key_item input',  this.elem).change(function () {
         var key = jQuery(this).val();
-        if($(this).prop('checked')) {         
+        if($(this).prop('checked')) {     
             maps_object.addLayer(parseInt(key));
         }
         else { 
@@ -292,7 +294,7 @@ lambeth_map.prototype.renderPostcodeLookup = function () {
 
     $('.postcode_input', this.elem).keyup('enterKey', function (e) {
         if (e.keyCode === 13) {
-            var val = $('.postcode_submit', maps_object.elem).val();
+            var val = $('.postcode_input', maps_object.elem).val();
             maps_object.postcodeLookup(val);
         }
     });
@@ -320,10 +322,11 @@ lambeth_map.prototype.postcodeLookup = function (postcode) {
     
     postcode = address_array.join(' '); 
     postcode = encodeURIComponent(postcode);
+      
+    var url = 'http://nominatim.openstreetmap.org/search?format=json&q=' + postcode + '&bounded=1&boundingbox="51.417986,51.507918,-0.078743,-0.15216"&json_callback=?'; 
     
-    jQuery.getJSON('http://nominatim.openstreetmap.org/search?format=json&q=' + postcode + '&bounded=1&boundingbox="51.417986,51.507918,-0.078743,-0.15216"&json_callback=?', function (data) {
-        
-        console.log(data);
+    //TODO: remove DOM interactions from this method 
+    jQuery.getJSON(url, function(data) {
         
         $('.loading_gif', maps_object.elem).remove();
         
@@ -334,11 +337,17 @@ lambeth_map.prototype.postcodeLookup = function (postcode) {
             });
         }
         else {
+            $('.warning', maps_object.elem).remove();
             maps_object.map.setView([data[0].lat, data[0].lon], 15);
+            maps_object.hereIAmMarker(data[0].lat, data[0].lon);
         }
     });
 };
 
+lambeth_map.prototype.hereIAmMarker = function(lat, lon) {
+    var hereIcon = new L.icon({iconUrl: 'img/here_i_am.png'});
+    this.hereMarker = L.marker([lat, lon], {icon: hereIcon}).addTo(this.map);
+};
 
 jQuery(document).ready(function () {
     //Loop through all the maps elements and init a map
@@ -348,7 +357,7 @@ jQuery(document).ready(function () {
     });
 });
 
-//UTILITY FUNCTION 
+//UTILITY FUNCTIONS 
 lambeth_map.htmlDecode = function (input) {
     var e = document.createElement('div');
     e.innerHTML = input;

@@ -97,9 +97,9 @@
 }
 
 .loading_gif { 
-    position:relative;
-    top:-45px;
-    left:140px;
+    position:absolute;
+    margin-top:-45px;
+    margin-left:140px;
     z-index:50;
 }
 
