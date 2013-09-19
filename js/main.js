@@ -350,6 +350,7 @@ lambeth_map.prototype.postcodeLookup = function (postcode) {
 };
 
 lambeth_map.prototype.hereIAmMarker = function(lat, lon) {
+    if(this.hereMarker) {this.map.removeLayer(this.hereMarker);} //remove icon if it's in the wrong place
     var hereIcon = new L.icon({iconUrl: '/sites/all/modules/custom/lambeth_interactive_map/img/here_i_am.png'});
     this.hereMarker = L.marker([lat, lon], {icon: hereIcon}).addTo(this.map);
 };
