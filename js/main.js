@@ -143,10 +143,12 @@ lambeth_map.prototype.discoverTypes = function () {
 
         //detect when we have looped through all the features
         if(maps_object.data.features.length - 1 == key) {
+            
+            //order 
+            maps_object.alphabetiseTypes();
 
             //render the right UX
             if(maps_object.searchType == 'drop-down') {
-                
                 maps_object.renderDropDown();
             } else if(maps_object.searchType == 'auto-suggest') {
                 maps_object.renderAutoSuggest();
@@ -156,6 +158,11 @@ lambeth_map.prototype.discoverTypes = function () {
 
         }
     });
+}
+
+
+lambeth_map.prototype.alphabetiseTypes = function() { 
+    this.types.sort()
 }
 
 lambeth_map.prototype.addLayer = function(type_id) {
@@ -173,8 +180,6 @@ lambeth_map.prototype.addLayer = function(type_id) {
             leaflet_layer.bindPopup(feature.properties.name);
         },
         filter: function (feature) {
-            console.log(type_id); 
-            console.log(feature.properties.type_id); 
             if (type_id === 'all') {
                 return true;
             } else if (feature.properties.type_id == type_id) {
@@ -318,7 +323,7 @@ lambeth_map.prototype.postcodeLookup = function (postcode) {
         }
     }
     
-    $('.postcode_lookup', maps_object.elem).append('<img src="img/loading.gif" class="loading_gif" alt="loading" />'); 
+    $('.postcode_lookup', maps_object.elem).append('<img src="/sites/all/modules/custom/lambeth_interactive_map/img/loading.gif" class="loading_gif" alt="loading" />'); 
     
     postcode = address_array.join(' '); 
     postcode = encodeURIComponent(postcode);
@@ -345,7 +350,7 @@ lambeth_map.prototype.postcodeLookup = function (postcode) {
 };
 
 lambeth_map.prototype.hereIAmMarker = function(lat, lon) {
-    var hereIcon = new L.icon({iconUrl: 'img/here_i_am.png'});
+    var hereIcon = new L.icon({iconUrl: '/sites/all/modules/custom/lambeth_interactive_map/img/here_i_am.png'});
     this.hereMarker = L.marker([lat, lon], {icon: hereIcon}).addTo(this.map);
 };
 
