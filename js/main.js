@@ -251,6 +251,7 @@ lambeth_map.prototype.renderDropDown = function () {
         jQuery('.type_selector', this.elem).append("<option value='" + key + "'>" + value.name + "</option>");
     });
 
+
     //ensure there are no events stuck on this element
     jQuery('.type_selector', this.elem).unbind();
     jQuery('.type_selector', this.elem).change(function () {
@@ -296,6 +297,10 @@ lambeth_map.prototype.renderKey = function (options) {
 
         jQuery('.key', maps_object.elem).append(html);
     });
+
+    //make the first set selected 
+    maps_object.addLayer(0);
+    jQuery('.key_item input:first').attr('checked', 'checked');
 
     //ensure there are no events stuck on this element
     jQuery('.key_item input', this.elem).unbind();
