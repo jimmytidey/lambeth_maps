@@ -4,23 +4,22 @@ function lambeth_map(elem) {
     this.point_layers = [];
 
     //import config
-    this.outline_url = jQuery(elem).attr('data-map-outline-url');
-
-    this.url = jQuery(elem).attr('data-map-url'); //URL for geoJSON
-    this.filterField = jQuery(elem).attr('data-map-filter-on'); // Field used for dropdown/lookup
-    this.zoom = parseInt(jQuery(elem).attr('data-map-zoom')); //Map Zoom
-
-    centre = jQuery(elem).attr('data-map-centre').split(','); //Map Centre
-    this.lat = parseFloat(centre[0]);
-    this.lng = parseFloat(centre[1]);
+    this.outline_url    = jQuery(elem).attr('data-map-outline-url');
+    this.url            = jQuery(elem).attr('data-map-url'); //URL for geoJSON
+    this.fixed_layer_url= jQuery(elem).attr('data-map-fixed-layer-url');
+    this.filterField    = jQuery(elem).attr('data-map-filter-on'); // Field used for dropdown/lookup
+    this.zoom           = parseInt(jQuery(elem).attr('data-map-zoom')); //Map Zoom
+    
+    var centre          = jQuery(elem).attr('data-map-centre').split(','); //Map Centre
+    this.lat            = parseFloat(centre[0]);
+    this.lng            = parseFloat(centre[1]);
 
     this.postcode_search = jQuery(elem).attr('data-map-postcode-search');
-    this.searchType = jQuery(elem).attr('data-map-search-type');
-
+    this.searchType      = jQuery(elem).attr('data-map-search-type');
+    
     this.elem = elem; //The HTML element we inserting into
-    this.drawMap(); //Init the map                                   
+    this.drawMap(); //Init the map                           
 }
-
 
 lambeth_map.prototype.drawMap = function () {
 
@@ -30,19 +29,18 @@ lambeth_map.prototype.drawMap = function () {
     jQuery(this.elem).append("<div class='map_container'></div>");
     jQuery('.map_container', this.elem).append("<div class='leaflet_container'></div>");
 
-
     //do we need to render a control panel? 
-    if (this.searchType || this.postcode_search === 'true') {
+    if(this.searchType || this.postcode_search === 'true') {
 
         //move the main map over 
         jQuery('.leaflet_container', this.elem).addClass("map_with_controls");
 
         //add control panel 
         var html = '<div class="controls_container"></div>';
-        jQuery(".map_container", maps_object.elem).append(html)
+        jQuery(".map_container", maps_object.elem).append(html);
     }
 
-    if (this.postcode_search === 'true') {
+    if(this.postcode_search === 'true') {
         this.renderPostcodeLookup();
     }
 
@@ -55,20 +53,31 @@ lambeth_map.prototype.drawMap = function () {
 
     //show the boundry of lambeth
     this.renderOutline();
-    this.getJSON();
+    //this.getJSON(this.url, this.discoverTypes);
+    this.getJSON(this.url, this.discoverTypes);
+    
+    if(this.fixed_layer_url) {
+        this.getJSON(this.fixed_layer_url, this.addFixedLayer);
+    }
 };
 
-lambeth_map.prototype.getJSON = function() { 
+lambeth_map.prototype.testFunc = function (geoJsonObject) { 
+    console.log('TEST FUNCTION');
+    console.log(geoJsonObject);
+} 
+
+lambeth_map.prototype.getJSON = function (url, callback) {
     
     var maps_object = this;
-    jQuery.getJSON(this.url + "?callback=?", function (data) {
-        maps_object.data = data;
-
+    
+    jQuery.getJSON(url + "?callback=?", function (geoJsonObject) {
+    
         //remove any null features 
-        maps_object.data.features = maps_object.data.features.filter(function (e) {
-            return e
-        });
-        maps_object.discoverTypes();
+        //data.features.filter(function (e) {
+            //return e
+        //});
+
+        callback.call(maps_object, geoJsonObject);
     });    
 }
 
@@ -94,30 +103,70 @@ lambeth_map.prototype.renderOutline = function () {
     });
 }
 
-lambeth_map.prototype.discoverTypes = function () {
+lambeth_map.prototype.addFixedLayer = function(data) { 
 
-    //List every type of feature in the geo JSON
+    this.fixed_layer_data = data;
+    
     var maps_object = this;
 
-    jQuery.each(this.data.features, function (key, value) {
-        
-        //test - do we already have this in the output array ?
-        var add_to_types_array = true; 
-                
-        for (var i=0; i < maps_object.types.length; i++) {
+    //add new stuff
+    this.fixed_layer = L.geoJson(this.fixed_layer_data, {
+        onEachFeature: function (feature, leaflet_layer) {       
+            
+            var icon = L.icon({
+                iconUrl: feature.properties.uri_rendered,
+                iconSize: [39, 50],
+                iconAnchor: [19, 25],
+                popupAnchor: [0, -25]
+            });
+            
+            if(feature.properties.uri_rendered) {
+                leaflet_layer.setIcon(icon);
+            }
+            leaflet_layer.options.title = feature.properties.name;
+            leaflet_layer.bindPopup(feature.properties.name);
+        }
+    }).addTo(this.map);
+    
+    //add this element to the key
+    var html = '<div class="fixed_layer_key"><div>';
+    
+    jQuery('.controls_container', this.elem).append(html);
+    
+    
+    var img_url = value.icon_url;
+    var html = "<div class='key_item' >hi<img src='" + img_url + "' /><label for='checkbox_" + value.name + "'>" + value.name + "</label></div>";
 
-            if (value.properties[maps_object.filterField] == maps_object.types[i].name) { 
+    jQuery('.fixed_layer_key', maps_object.elem).append(html);
+    
+}
+
+lambeth_map.prototype.discoverTypes = function (geoJsonObject) {
+
+    
+    //List every type of feature in the geo JSON
+    var maps_object = this;
+    this.data = geoJsonObject;
+    
+    jQuery.each(this.data.features, function (key, value) {
+
+        //test - do we already have this in the output array ?
+        var add_to_types_array = true;
+
+        for(var i = 0; i < maps_object.types.length; i++) {
+
+            if(value.properties[maps_object.filterField] == maps_object.types[i].name) {
                 add_to_types_array = false;
             }
         }
-        
+
         //if it wasn't found it the types array, add it in 
-        if (add_to_types_array) {
+        if(add_to_types_array) {
             var type_name = value.properties[maps_object.filterField];
-            if (type_name !== '' && type_name !== null) {
+            if(type_name !== '' && type_name !== null) {
 
                 //add new icon if one is available
-                if (value.properties.uri_rendered) {
+                if(value.properties.uri_rendered) {
 
                     var custom_icon = L.icon({
                         iconUrl: value.properties.uri_rendered,
@@ -125,9 +174,9 @@ lambeth_map.prototype.discoverTypes = function () {
                         iconAnchor: [19, 25],
                         popupAnchor: [0, -25]
                     });
-                    
-                    var icon_url =value.properties.uri_rendered;
-                    
+
+                    var icon_url = value.properties.uri_rendered;
+
                 } else {
                     icon = null;
                     icon_url = null;
@@ -135,8 +184,8 @@ lambeth_map.prototype.discoverTypes = function () {
 
                 maps_object.types.push({
                     icon: custom_icon,
-                    name: type_name, 
-                    icon_url: icon_url    
+                    name: type_name,
+                    icon_url: icon_url
                 });
             }
         }
@@ -147,15 +196,15 @@ lambeth_map.prototype.discoverTypes = function () {
 
     //add types to the data 
     this.addTypesToFeatuers();
-    
+
     //render the right UX
-    if (maps_object.searchType == 'drop-down') {
+    if(maps_object.searchType == 'drop-down') {
         maps_object.renderDropDown();
-    } else if (maps_object.searchType == 'auto-suggest') {
+    } else if(maps_object.searchType == 'auto-suggest') {
         maps_object.renderAutoSuggest();
-    } else if (maps_object.searchType == 'key') {
+    } else if(maps_object.searchType == 'key') {
         maps_object.renderKey();
-        
+
     }
 }
 
@@ -167,51 +216,47 @@ lambeth_map.prototype.addTypesToFeatuers = function () {
 
         var type_index = null
 
-        for (var i=0; i < maps_object.types.length; i++) {
-            if (value.properties[maps_object.filterField] == maps_object.types[i].name) {
+        for(var i = 0; i < maps_object.types.length; i++) {
+            if(value.properties[maps_object.filterField] == maps_object.types[i].name) {
                 value.properties.type_id = i;
             }
         }
-
     });
 }
-
 
 lambeth_map.prototype.sortTypes = function () {
     this.types.sort(function (a, b) {
         var nameA = a.name.toLowerCase(),
-            nameB = b.name.toLowerCase()
-            if (nameA < nameB) //sort string ascending
-                return -1
-            if (nameA > nameB)
-                return 1
-            return 0 //default return value (no sorting)
+        nameB = b.name.toLowerCase()
+        if(nameA < nameB) {  //sort string ascending
+            return -1
+        }
+        if(nameA > nameB) { 
+            return 1
+        }    
+        return 0 //default return value (no sorting)
     });
 }
 
-
-
 lambeth_map.prototype.addLayer = function (type_id) {
-    
+
     var maps_object = this;
-    
+
     //add new stuff
     this.point_layers[type_id] = L.geoJson(this.data, {
         onEachFeature: function (feature, leaflet_layer) { //layer here refering to leaflets internal concept of layer        
-            
-            if (leaflet_layer.setIcon) {
+
+            if(leaflet_layer.setIcon) {
                 leaflet_layer.setIcon(maps_object.types[feature.properties.type_id].icon);
-                leaflet_layer.options.title  = feature.properties.name;
-                
+                leaflet_layer.options.title = feature.properties.name;
             }
-            
+
             leaflet_layer.bindPopup(feature.properties.name);
         },
         filter: function (feature) {
-            console.log("compare", feature.properties.type_id +"  " +type_id);
-            if (type_id === 'all') {
+            if(type_id === 'all') {
                 return true;
-            } else if (feature.properties.type_id == type_id) {
+            } else if(feature.properties.type_id == type_id) {
                 return true;
             } else {
                 return false;
@@ -226,12 +271,11 @@ lambeth_map.prototype.removeAllLayers = function () {
 
     jQuery.each(this.point_layers, function (key, val) {
 
-        if (typeof val !== 'undefined') {
+        if(typeof val !== 'undefined') {
             maps_object.map.removeLayer(val);
         }
     });
 }
-
 
 lambeth_map.prototype.removeLayer = function (type_id) {
     this.map.removeLayer(this.point_layers[type_id]);
@@ -250,7 +294,6 @@ lambeth_map.prototype.renderDropDown = function () {
     jQuery.each(this.types, function (key, value) {
         jQuery('.type_selector', this.elem).append("<option value='" + key + "'>" + value.name + "</option>");
     });
-
 
     //ensure there are no events stuck on this element
     jQuery('.type_selector', this.elem).unbind();
@@ -283,7 +326,7 @@ lambeth_map.prototype.renderAutoSuggest = function () {
 }
 
 lambeth_map.prototype.renderKey = function (options) {
-    
+
     var maps_object = this;
 
     //add the selector HTML
@@ -299,23 +342,25 @@ lambeth_map.prototype.renderKey = function (options) {
     });
 
     //make the first set selected 
-    maps_object.addLayer(0);
-    jQuery('.key_item input:first').attr('checked', 'checked');
+    if(this.types.length == 1) {
+        maps_object.addLayer(0);
+        jQuery('.key_item input:first').attr('checked', 'checked');
+    }
 
     //ensure there are no events stuck on this element
+
     jQuery('.key_item input', this.elem).unbind();
     jQuery('.key_item input', this.elem).change(function () {
         var key = jQuery(this).val();
         
-        if (jQuery(this).attr('checked')) {
-            console.log('key:', parseInt(key));
+        if(jQuery(this).is(':checked')) {
+            
             maps_object.addLayer(parseInt(key));
         } else {
             maps_object.removeLayer(parseInt(key));
         }
     });
 }
-
 lambeth_map.prototype.renderPostcodeLookup = function () {
 
     var maps_object = this;
@@ -326,20 +371,18 @@ lambeth_map.prototype.renderPostcodeLookup = function () {
 
     lambeth_map.addPlaceholder();
 
-
     jQuery('.postcode_submit', this.elem).click(function () {
         var val = jQuery('.postcode_input', maps_object.elem).val();
         maps_object.postcodeLookup(val);
     });
 
     jQuery('.postcode_input', this.elem).keyup('enterKey', function (e) {
-        if (e.keyCode === 13) {
+        if(e.keyCode === 13) {
             var val = jQuery('.postcode_input', maps_object.elem).val();
             maps_object.postcodeLookup(val);
         }
     });
 };
-
 
 lambeth_map.prototype.postcodeLookup = function (postcode) {
 
@@ -351,9 +394,9 @@ lambeth_map.prototype.postcodeLookup = function (postcode) {
     //specific to brixton !! 
     address_array = postcode.split(' ');
 
-    for (i = 0; i < address_array.length; i++) {
+    for(i = 0; i < address_array.length; i++) {
         //test if this is a brixton postcode with spaces missing
-        if (address_array[i].length == 6 && (address_array[i].toUpperCase().substr(0, 3) == 'SW2' || address_array[i].toUpperCase().substr(0, 3) == 'SW9')) {
+        if(address_array[i].length == 6 && (address_array[i].toUpperCase().substr(0, 3) == 'SW2' || address_array[i].toUpperCase().substr(0, 3) == 'SW9')) {
             address_array[i] = address_array[i].slice(0, 3) + " " + address_array[i].slice(3);
         }
     }
@@ -370,7 +413,7 @@ lambeth_map.prototype.postcodeLookup = function (postcode) {
 
         jQuery('.loading_gif', maps_object.elem).remove();
 
-        if (typeof data[0] === 'undefined') {
+        if(typeof data[0] === 'undefined') {
             jQuery('.postcode_lookup', maps_object.elem).append('<p style="display:none" class="warning">No results found</p>');
             jQuery('.warning', maps_object.elem).slideDown('slow').delay(5000).slideUp('slow', function () {
                 jQuery('.warning', maps_object.elem).remove();
@@ -384,7 +427,7 @@ lambeth_map.prototype.postcodeLookup = function (postcode) {
 };
 
 lambeth_map.prototype.hereIAmMarker = function (lat, lon) {
-    if (this.hereMarker) {
+    if(this.hereMarker) {
         this.map.removeLayer(this.hereMarker);
     } //remove icon if it's in the wrong place
     var hereIcon = new L.icon({
@@ -395,6 +438,7 @@ lambeth_map.prototype.hereIAmMarker = function (lat, lon) {
     }).addTo(this.map);
 };
 
+//INITIALISE... 
 jQuery(document).ready(function () {
     //Loop through all the maps elements and init a map
     lambeth_maps = [];
@@ -411,17 +455,17 @@ lambeth_map.htmlDecode = function (input) {
 }
 
 lambeth_map.addPlaceholder = function () {
-    if (typeof Modernizr === 'undefined') {
+    if(typeof Modernizr === 'undefined') {
 
         jQuery('[placeholder]').focus(function () {
             var input = jQuery(this);
-            if (input.val() == input.attr('placeholder')) {
+            if(input.val() == input.attr('placeholder')) {
                 input.val('');
                 input.removeClass('placeholder');
             }
         }).blur(function () {
             var input = jQuery(this);
-            if (input.val() == '' || input.val() == input.attr('placeholder')) {
+            if(input.val() == '' || input.val() == input.attr('placeholder')) {
                 input.addClass('placeholder');
                 input.val(input.attr('placeholder'));
             }
@@ -429,7 +473,7 @@ lambeth_map.addPlaceholder = function () {
         jQuery('[placeholder]').parents('form').submit(function () {
             jQuery(this).find('[placeholder]').each(function () {
                 var input = jQuery(this);
-                if (input.val() == input.attr('placeholder')) {
+                if(input.val() == input.attr('placeholder')) {
                     input.val('');
                 }
             })
